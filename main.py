@@ -3,12 +3,15 @@ import re
 import shutil
 import subprocess
 import sys
-import time
 import requests
+from time import sleep
 from urllib import parse
 from os import listdir
-from os.path import isfile, join
+from os.path import isfile
 from pathlib import Path
+from difflib import get_close_matches
+from tqdm import tqdm
+from transmission_rpc import Client
 
 
 def get_filtered_name(file_name: str):
@@ -18,34 +21,47 @@ def get_filtered_name(file_name: str):
 
 
 def rename(path: str):
-    # files = [f for f in listdir(path) if isfile(join(path, f))]
     files = listdir(path)
+    amount = 0
     for file_name in files:
         filtered_name = get_filtered_name(file_name)
         if file_name != filtered_name:
             os.rename(os.path.join(path, file_name), os.path.join(path, filtered_name))
+            amount += 1
+    print(f"Renamed {amount} item{'' if amount == 1 else 's'}.")
 
 
 def get_torrent_name(url: str) -> str:
     r = requests.get(url, allow_redirects=True)
     response = r.headers.get('content-disposition')
-    match = re.search(r"(?<=UTF-8'').*?(?=.torrent)", response)
+    match = re.search(r"(?<=filename=\").*?(?=.torrent)", response)
     return parse.unquote(match.group())
 
 
-def wait_for_torrent(final_path: str, url: str) -> str:
-    t = time.time()
-    # torrent_name = get_torrent_name(url)
-    initial_items = listdir(final_path)
-    while True:
-        for i in range(1, 4):
-            s = f'\rWaiting {int(time.time() - t)} seconds{"." * i}'
-            print(f'{s: <22}', end='')
-            dir_items = listdir(final_path)
-            if len(dir_items) > len(initial_items):
-                print()
-                return list(set(dir_items) - set(initial_items))[0]
-            time.sleep(1)
+def get_torrent(name: str, torrents: list):
+    torrent_names = list(map(lambda t: t.name, torrents))
+    match_name = get_close_matches(name, torrent_names)[0]
+    return list(filter(lambda t: t.name == match_name, torrents))[0]
+
+
+def wait_for_torrent(url: str, username: str, password: str) -> str:
+    c = Client(host='localhost', port=9096, username=username, password=password)
+    name = get_torrent_name(url)
+    custom_format = "{desc}{percentage:5.2f}% |{bar}| [{elapsed}{postfix}]"
+    with tqdm(total=100, bar_format=custom_format, dynamic_ncols=True) as bar:
+        while True:
+            torrents = c.get_torrents()
+            torrent = get_torrent(name, torrents)
+            if torrent.progress == 100.0:
+                c.remove_torrent(torrent.id)
+                return torrent.name
+            bar.n = torrent.progress
+            bar.set_description(f"{torrent.status.capitalize()} '{name}'")
+            eta = torrent.format_eta().replace("0 ", "")
+            speed = round(torrent.rateDownload / 1000000, 1)
+            bar.set_postfix_str(f"{eta}, {speed} MB/s")
+            bar.update()
+            sleep(1)
 
 
 def run(path: str, url: str):
@@ -56,11 +72,13 @@ def run(path: str, url: str):
         final_path += '/'
     Path(final_path).mkdir(parents=True, exist_ok=True)
 
-    pwd = ['-n', '{USERNAME}:{PASSWORD}']
-    cmd = ['transmission-remote', '9096', '-a', url, '-w', downloads] + pwd
+    username = os.environ["TRANSMISSION_USER"]
+    password = os.environ["TRANSMISSION_PASS"]
+    cmd = ['transmission-remote', '9096', '-a', url, '-w', downloads, '-n', f"{username}:{password}"]
     subprocess.run(cmd)
 
-    torrent_name = wait_for_torrent(downloads, url)
+    torrent_name = wait_for_torrent(url, username, password)
+    print()
     final_file_name = os.path.join(final_path, torrent_name)
     shutil.move(os.path.join(downloads, torrent_name), final_file_name)
     if not isfile(final_file_name):
