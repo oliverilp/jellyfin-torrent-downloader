@@ -15,8 +15,8 @@ from transmission_rpc import Client
 
 
 def get_filtered_name(file_name: str):
-    filtered = re.sub(r'(\[.*?\])|(\d{3,4}p)|(\((?!\d{4}).*?\))', '', file_name)
-    filtered = re.sub(r'(\s+(?=\.\w+$))', '', filtered).lstrip()  # clean up whitespace
+    filtered = re.sub(r"(\[.*?\])|(\d{3,4}p)|(\((?!\d{4}).*?\))", "", file_name)
+    filtered = re.sub(r"(\s+(?=\.\w+$))", "", filtered).strip()  # clean up whitespace
     return filtered
 
 
@@ -33,7 +33,7 @@ def rename(path: str):
 
 def get_torrent_name(url: str) -> str:
     r = requests.get(url, allow_redirects=True)
-    response = r.headers.get('content-disposition')
+    response = r.headers.get("content-disposition")
     match = re.search(r"(?<=filename=\").*?(?=.torrent)", response)
     return parse.unquote(match.group())
 
@@ -45,36 +45,37 @@ def get_torrent(name: str, torrents: list):
 
 
 def wait_for_torrent(url: str, username: str, password: str) -> str:
-    c = Client(host='localhost', port=9096, username=username, password=password)
+    c = Client(host="localhost", port=9096, username=username, password=password)
     name = get_torrent_name(url)
     custom_format = "{desc}{percentage:5.2f}% |{bar}| [{elapsed}{postfix}]"
-    with tqdm(total=100, bar_format=custom_format, dynamic_ncols=True) as bar:
+    with tqdm(total=100, bar_format=custom_format, dynamic_ncols=True, colour="green") as bar:
         while True:
             torrents = c.get_torrents()
             torrent = get_torrent(name, torrents)
-            if torrent.progress == 100.0:
-                c.remove_torrent(torrent.id)
-                return torrent.name
             bar.n = torrent.progress
+            if torrent.progress >= 100.0:
+                c.remove_torrent(torrent.id)
+                bar.update(0)
+                return torrent.name
             bar.set_description(f"{torrent.status.capitalize()} '{name}'")
             eta = torrent.format_eta().replace("0 ", "")
             speed = round(torrent.rateDownload / 1000000, 1)
             bar.set_postfix_str(f"{eta}, {speed} MB/s")
-            bar.update()
+            bar.update(0)
             sleep(1)
 
 
 def run(path: str, url: str):
-    base_path = '/home/media/'
-    downloads = os.path.normpath(os.path.join(base_path, 'downloads'))
+    base_path = "/home/media/"
+    downloads = os.path.normpath(os.path.join(base_path, "downloads"))
     final_path = os.path.normpath(os.path.join(base_path, path))
-    if not final_path.endswith('/'):
-        final_path += '/'
+    if not final_path.endswith("/"):
+        final_path += "/"
     Path(final_path).mkdir(parents=True, exist_ok=True)
 
     username = os.environ["TRANSMISSION_USER"]
     password = os.environ["TRANSMISSION_PASS"]
-    cmd = ['transmission-remote', '9096', '-a', url, '-w', downloads, '-n', f"{username}:{password}"]
+    cmd = ["transmission-remote", "9096", "-a", url, "-w", downloads, "-n", f"{username}:{password}"]
     subprocess.run(cmd)
 
     torrent_name = wait_for_torrent(url, username, password)
@@ -98,5 +99,5 @@ def main():
         print("Error, incorrect arguments.")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
