@@ -12,6 +12,7 @@ from pathlib import Path
 from difflib import get_close_matches
 from tqdm import tqdm
 from transmission_rpc import Client
+from transmission_rpc.utils import format_size
 
 
 def get_filtered_name(file_name: str):
@@ -45,19 +46,23 @@ def get_torrent(name: str, torrents: list):
 
 
 def wait_for_torrent(url: str, username: str, password: str) -> str:
-    c = Client(host="localhost", port=9096, username=username, password=password)
+    client = Client(host="localhost", port=9096, username=username, password=password)
     name = get_torrent_name(url)
     custom_format = "{desc}{percentage:5.2f}% |{bar}| [{elapsed}{postfix}]"
+
+    torrent = get_torrent(name, client.get_torrents())
+    print(f"Torrent file: {name} ({format_size(torrent._fields['sizeWhenDone'].value)})")
+
     with tqdm(total=100, bar_format=custom_format, dynamic_ncols=True, colour="green") as bar:
         while True:
-            torrents = c.get_torrents()
+            torrents = client.get_torrents()
             torrent = get_torrent(name, torrents)
             bar.n = torrent.progress
             if torrent.progress >= 100.0:
-                c.remove_torrent(torrent.id)
+                client.remove_torrent(torrent.id)
                 bar.update(0)
                 return torrent.name
-            bar.set_description(f"{torrent.status.capitalize()} '{name}'")
+            bar.set_description(f"{torrent.status.capitalize()} '{get_filtered_name(torrent.name)}'")
             eta = torrent.format_eta().replace("0 ", "")
             speed = round(torrent.rateDownload / 1000000, 1)
             bar.set_postfix_str(f"{eta}, {speed} MB/s")
