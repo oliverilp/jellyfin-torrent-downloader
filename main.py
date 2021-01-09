@@ -18,7 +18,7 @@ from transmission_rpc.utils import format_size
 def get_filtered_name(file_name: str):
     filtered = re.sub(r"(\[.*?\])|(\d{3,4}p)|(\((?!\d{4}).*?\))", "", file_name)
     filtered = re.sub(r"(\s+(?=\.\w+$))", "", filtered).strip()  # clean up whitespace
-    return filtered
+    return filtered if len(filtered) > 4 else file_name
 
 
 def rename(path: str):
@@ -51,7 +51,8 @@ def wait_for_torrent(url: str, username: str, password: str) -> str:
     custom_format = "{desc}{percentage:5.2f}% |{bar}| [{elapsed}{postfix}]"
 
     torrent = get_torrent(name, client.get_torrents())
-    print(f"Torrent file: {name} ({format_size(torrent._fields['sizeWhenDone'].value)})")
+    size, suffix = format_size(torrent._fields['sizeWhenDone'].value)
+    print(f"Torrent file: '{name}' ({round(size, 1)} {suffix})")
 
     with tqdm(total=100, bar_format=custom_format, dynamic_ncols=True, colour="green") as bar:
         while True:
