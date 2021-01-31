@@ -1,7 +1,6 @@
 import os
 import re
 import shutil
-import subprocess
 import sys
 import requests
 from time import sleep
@@ -11,8 +10,8 @@ from os.path import isfile
 from pathlib import Path
 from difflib import get_close_matches
 from tqdm import tqdm
-from transmission_rpc import Client
-from transmission_rpc.utils import format_size
+import qbittorrentapi
+from hurry.filesize import size, alternative
 
 
 def get_filtered_name(file_name: str):
@@ -45,28 +44,29 @@ def get_torrent(name: str, torrents: list):
     return list(filter(lambda t: t.name == match_name, torrents))[0]
 
 
-def wait_for_torrent(url: str, username: str, password: str) -> str:
-    client = Client(host="localhost", port=9096, username=username, password=password)
+def wait_for_torrent(url: str, client: qbittorrentapi.Client) -> str:
     name = get_torrent_name(url)
     custom_format = "{desc}{percentage:5.2f}% |{bar}| [{elapsed}{postfix}]"
 
-    torrent = get_torrent(name, client.get_torrents())
-    size, suffix = format_size(torrent._fields['sizeWhenDone'].value)
-    print(f"Torrent file: '{name}' ({round(size, 1)} {suffix})")
+    torrent = get_torrent(name, client.torrents.info())
+    total_size = size(torrent.properties.total_size, system=alternative)
+    print(f"Torrent file: '{name}' ({total_size})")
 
     with tqdm(total=100, bar_format=custom_format, dynamic_ncols=True, colour="green") as bar:
         while True:
-            torrents = client.get_torrents()
-            torrent = get_torrent(name, torrents)
-            bar.n = torrent.progress
-            if torrent.progress >= 100.0:
-                client.remove_torrent(torrent.id)
+            torrent = get_torrent(name, client.torrents.info())
+            progress = torrent.progress * 100
+            bar.n = progress
+            if progress >= 100.0:
+                client.torrents_delete(torrent_hashes=torrent.hash)
                 bar.update(0)
                 return torrent.name
-            bar.set_description(f"{torrent.status.capitalize()} '{get_filtered_name(torrent.name)}'")
-            eta = torrent.format_eta().replace("0 ", "")
-            speed = round(torrent.rateDownload / 1000000, 1)
-            bar.set_postfix_str(f"{eta}, {speed} MB/s")
+            state = torrent.state_enum.name.capitalize().replace("_", " ")
+            bar.set_description(f"{state} '{get_filtered_name(torrent.name)}'")
+
+            eta = round(torrent.eta / 60)
+            speed = size(torrent.dlspeed, system=alternative)
+            bar.set_postfix_str(f"{eta if eta > 0 else '< 1'}m, {speed}/s")
             bar.update(0)
             sleep(1)
 
@@ -81,10 +81,11 @@ def run(path: str, url: str):
 
     username = os.environ["TRANSMISSION_USER"]
     password = os.environ["TRANSMISSION_PASS"]
-    cmd = ["transmission-remote", "9096", "-a", url, "-w", downloads, "-n", f"{username}:{password}"]
-    subprocess.run(cmd)
+    client = qbittorrentapi.Client(host='localhost:9093', username=username, password=password)
+    client.torrents_add(urls=url)
+    sleep(1)
 
-    torrent_name = wait_for_torrent(url, username, password)
+    torrent_name = wait_for_torrent(url, client)
     print()
     final_file_name = os.path.join(final_path, torrent_name)
     shutil.move(os.path.join(downloads, torrent_name), final_file_name)
