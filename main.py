@@ -24,7 +24,7 @@ def rename(path: str):
     files = listdir(path)
     amount = 0
     for file_name in files:
-        filtered_name = get_filtered_name(file_name)
+        filtered_name = get_filtered_name(get_filtered_name(file_name))  # make extra sure everything is removed
         if file_name != filtered_name:
             os.rename(os.path.join(path, file_name), os.path.join(path, filtered_name))
             amount += 1
