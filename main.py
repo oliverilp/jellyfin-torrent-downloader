@@ -72,7 +72,7 @@ def wait_for_torrent(url: str, client: qbittorrentapi.Client) -> str:
 
 
 def run(path: str, url: str):
-    base_path = "/home/media/"
+    base_path = "~/media/"
     downloads = os.path.normpath(os.path.join(base_path, "downloads"))
     final_path = os.path.normpath(os.path.join(base_path, path))
     if not final_path.endswith("/"):
