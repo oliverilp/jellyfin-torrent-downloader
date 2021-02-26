@@ -79,9 +79,10 @@ def run(path: str, url: str):
         final_path += "/"
     Path(final_path).mkdir(parents=True, exist_ok=True)
 
-    username = os.environ["TRANSMISSION_USER"]
-    password = os.environ["TRANSMISSION_PASS"]
-    client = qbittorrentapi.Client(host='localhost:9093', username=username, password=password)
+    username = os.environ["TORRENT_USER"]
+    password = os.environ["TORRENT_PASS"]
+    port = os.environ["TORRENT_PORT"]
+    client = qbittorrentapi.Client(host=f'localhost:{port}', username=username, password=password)
     client.torrents_add(urls=url)
     sleep(1)
 
