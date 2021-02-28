@@ -1,5 +1,5 @@
 # jellyfin-torrent-downloader
-![alt text](screenshot.png "Logo Title Text 1")
+![screenshot](screenshot.png)
 
 Small script used for my personal Netflix-like media server to automatically download movies and tv shows 
 and add them to its library. 
