@@ -81,15 +81,20 @@ def run(path: str, url: str):
 
     username = os.environ["TORRENT_USER"]
     password = os.environ["TORRENT_PASS"]
+    ip = os.environ["TORRENT_IP"]
     port = os.environ["TORRENT_PORT"]
-    client = qbittorrentapi.Client(host=f'localhost:{port}', username=username, password=password)
+
+    client = qbittorrentapi.Client(host=f'{ip}:{port}', username=username, password=password)
     client.torrents_add(urls=url)
     sleep(1)
 
     torrent_name = wait_for_torrent(url, client)
     print()
+    initial_file_name = os.path.join(downloads, torrent_name)
     final_file_name = os.path.join(final_path, torrent_name)
+    print(f"Moving from {initial_file_name} to {final_file_name}")
     shutil.move(os.path.join(downloads, torrent_name), final_file_name)
+
     if not isfile(final_file_name):
         rename(final_file_name)
     rename(final_path)
