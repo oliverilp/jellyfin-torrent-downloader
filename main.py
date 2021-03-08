@@ -14,6 +14,9 @@ import qbittorrentapi
 from hurry.filesize import size, alternative
 
 
+CATEGORY_NAME = "jellyfin-downloader"
+
+
 def get_filtered_name(file_name: str):
     filtered = re.sub(r"(\[.*?\])|(\d{3,4}p)|(\((?!\d{4}).*?\))", "", file_name)
     filtered = re.sub(r"(\s+(?=\.\w+$))", "", filtered).strip()  # clean up whitespace
@@ -39,8 +42,15 @@ def get_torrent_name(url: str) -> str:
 
 
 def get_torrent(name: str, torrents: list):
-    torrent_names = list(map(lambda t: t.name, torrents))
-    match_name = get_close_matches(name, torrent_names)[0]
+    filtered = list(filter(lambda t: t.category == CATEGORY_NAME, torrents))
+    torrent_names = list(map(lambda t: t.name, filtered))
+    matches = get_close_matches(name, torrent_names)
+    if not matches:
+        new_name = get_filtered_name(name)
+        if new_name == name:
+            raise RuntimeError("Cannot find torrent")
+        return get_torrent(new_name, torrents)
+    match_name = matches[0]
     return list(filter(lambda t: t.name == match_name, torrents))[0]
 
 
@@ -85,7 +95,7 @@ def run(path: str, url: str):
     port = os.environ["TORRENT_PORT"]
 
     client = qbittorrentapi.Client(host=f'{ip}:{port}', username=username, password=password)
-    client.torrents_add(urls=url)
+    client.torrents_add(urls=url, category="jellyfin-downloader")
     sleep(1)
 
     torrent_name = wait_for_torrent(url, client)
