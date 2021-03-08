@@ -95,7 +95,7 @@ def run(path: str, url: str):
     port = os.environ["TORRENT_PORT"]
 
     client = qbittorrentapi.Client(host=f'{ip}:{port}', username=username, password=password)
-    client.torrents_add(urls=url, category="jellyfin-downloader")
+    client.torrents_add(urls=url, category=CATEGORY_NAME)
     sleep(1)
 
     torrent_name = wait_for_torrent(url, client)
