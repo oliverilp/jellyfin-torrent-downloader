@@ -13,7 +13,6 @@ from tqdm import tqdm
 import qbittorrentapi
 from hurry.filesize import size, alternative
 
-
 CATEGORY_NAME = "jellyfin-downloader"
 
 
@@ -45,12 +44,17 @@ def get_torrent(name: str, torrents: list):
     filtered = list(filter(lambda t: t.category == CATEGORY_NAME, torrents))
     torrent_names = list(map(lambda t: t.name, filtered))
     matches = get_close_matches(name, torrent_names)
-    if not matches:
-        new_name = get_filtered_name(name)
-        if new_name == name:
-            raise RuntimeError("Cannot find torrent")
-        return get_torrent(new_name, torrents)
-    match_name = matches[0]
+    if len(torrent_names) == 1:
+        match_name = torrent_names[0]
+    else:
+        if not matches:
+            new_name = get_filtered_name(name)
+            print(new_name, name)
+            print("names", torrent_names)
+            if new_name == name:
+                raise RuntimeError("Cannot find torrent")
+            return get_torrent(new_name, torrents)
+        match_name = matches[0]
     return list(filter(lambda t: t.name == match_name, torrents))[0]
 
 
