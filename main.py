@@ -46,10 +46,10 @@ def get_torrent_name(url: str) -> str:
 def get_torrent(name: str, torrents: list):
     filtered = list(filter(lambda t: t.category == CATEGORY_NAME, torrents))
     torrent_names = list(map(lambda t: t.name, filtered))
-    matches = get_close_matches(name, torrent_names)
     if len(torrent_names) == 1:
         match_name = torrent_names[0]
     else:
+        matches = get_close_matches(name, torrent_names)
         if not matches:
             new_name = get_filtered_name(name)
             print(new_name, name)
