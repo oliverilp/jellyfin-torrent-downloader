@@ -16,9 +16,12 @@ from hurry.filesize import size, alternative
 CATEGORY_NAME = "jellyfin-downloader"
 
 
-def get_filtered_name(file_name: str):
+def get_filtered_name(file_name: str, count: int = 3):
     filtered = re.sub(r"(\[.*?\])|(\d{3,4}p)|(\((?!\d{4}).*?\))", "", file_name)
     filtered = re.sub(r"(\s+(?=\.\w+$))", "", filtered).strip()  # clean up whitespace
+    filtered = re.sub(r"(\s{2,})", " ", filtered)  # clean up multiple white space characters
+    if count != 0:
+        return get_filtered_name(filtered, count - 1)
     return filtered if len(filtered) > 4 else file_name
 
 
@@ -26,7 +29,7 @@ def rename(path: str):
     files = listdir(path)
     amount = 0
     for file_name in files:
-        filtered_name = get_filtered_name(get_filtered_name(file_name))  # make extra sure everything is removed
+        filtered_name = get_filtered_name(file_name)
         if file_name != filtered_name:
             os.rename(os.path.join(path, file_name), os.path.join(path, filtered_name))
             amount += 1
