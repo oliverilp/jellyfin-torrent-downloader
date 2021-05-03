@@ -21,8 +21,8 @@ def get_filtered_name(file_name: str, count: int = 3):
     filtered = re.sub(r"(\s+(?=\.\w+$))", "", filtered).strip()  # clean up whitespace
     filtered = re.sub(r"(\s{2,})", " ", filtered)  # clean up multiple white space characters
     if count != 0:
-        return get_filtered_name(filtered, count - 1)
-    return filtered if len(filtered) > 4 else file_name
+        return get_filtered_name(filtered, count - 1) if len(filtered) > 4 else file_name
+    return filtered
 
 
 def rename(path: str):
