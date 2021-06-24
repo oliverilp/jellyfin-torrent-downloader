@@ -8,7 +8,6 @@ from os import listdir
 from os.path import isfile
 from pathlib import Path
 from time import sleep
-from distutils.dir_util import copy_tree
 
 import qbittorrentapi
 from hurry.filesize import size, alternative
