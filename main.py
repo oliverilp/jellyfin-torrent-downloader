@@ -27,7 +27,7 @@ def get_filtered_name(file_name: str, count: int = 3):
         filtered = re.sub(word, '', filtered, flags=re.IGNORECASE)
 
     filtered = re.sub(r"(\s+(?=\.\w+$))", "", filtered).strip()  # clean up whitespace
-    filtered = re.sub(r"(\s{2,})", " ", filtered)  # clean up multiple white space characters
+    filtered = re.sub(r"(\s{2,})|(\.{2,})", " ", filtered)
     if count != 0:
         return get_filtered_name(filtered, count - 1) if len(filtered) > 4 else file_name
     return filtered
@@ -140,4 +140,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    # main()
+    print(get_filtered_name("Blade Runner 2049.HDRip.XviD.AC3-EVO"))
