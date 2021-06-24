@@ -8,6 +8,7 @@ from os import listdir
 from os.path import isfile
 from pathlib import Path
 from time import sleep
+from distutils.dir_util import copy_tree
 
 import qbittorrentapi
 from hurry.filesize import size, alternative
@@ -71,8 +72,8 @@ def wait_for_torrent(url: str, client: qbittorrentapi.Client) -> str:
             progress = torrent.progress * 100
             bar.n = progress
             if progress >= 100.0:
-                client.torrents_delete(torrent_hashes=torrent.hash)
-                client.torrent_tags.delete_tags(tags=get_hash(url))
+                # client.torrents_delete(torrent_hashes=torrent.hash)
+                # client.torrent_tags.delete_tags(tags=get_hash(url))
                 bar.update(0)
                 return torrent.name
             state = torrent.state_enum.name.capitalize().replace("_", " ")
@@ -107,7 +108,7 @@ def run(path: str, url: str):
     downloads_file_name = os.path.join(downloads, torrent_name)
     final_file_name = os.path.join(final_path, torrent_name)
     print(f"Moving from {downloads_file_name} to {final_file_name}")
-    shutil.copy(downloads_file_name, final_file_name)
+    copy_tree(downloads_file_name, final_file_name)
 
     if not isfile(final_file_name):
         rename(final_file_name, use_recursion=True)
