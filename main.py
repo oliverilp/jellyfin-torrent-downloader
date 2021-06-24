@@ -16,13 +16,17 @@ from tqdm import tqdm
 
 CATEGORY_NAME = "jellyfin-downloader"
 ALLOWED_FILE_TYPES = (".mkv", ".mp4", ".mp3", ".ass", ".srt", ".png", ".jpg", ".txt")
-BANNED_FILE_NAMES = ("RARBG.txt",)
+BANNED_FILE_NAMES = {"RARBG.txt"}
+BANNED_WORDS = {"rarbg", "bluray", "blu-ray", "x264-", "x265-", "h264-", "h265-", "webrip"}
 
 
 def get_filtered_name(file_name: str, count: int = 3):
     filtered = re.sub(r"(\[.*?\])|(\d{3,4}p)|(\((?!\d{4}).*?\))", "", file_name)
     if " " not in file_name and file_name.count(".") >= 3:
         filtered = re.sub(r"\.(?!\w{3}$)", " ", filtered)  # Replace dots with spaces
+    for word in BANNED_WORDS:
+        filtered = re.sub(word, '', filtered, flags=re.IGNORECASE)
+
     filtered = re.sub(r"(\s+(?=\.\w+$))", "", filtered).strip()  # clean up whitespace
     filtered = re.sub(r"(\s{2,})", " ", filtered)  # clean up multiple white space characters
     if count != 0:
@@ -30,21 +34,26 @@ def get_filtered_name(file_name: str, count: int = 3):
     return filtered
 
 
-# If every item is dir then use rec
-# Find newest dir
-def rename(path: str, use_recursion=False):
+def clean_up_path(path: str, use_recursion=False):
     files = listdir(path)
     amount = 0
     for file_name in files:
+        old_path = os.path.join(path, file_name)
+        if isfile(old_path) and (not file_name.endswith(ALLOWED_FILE_TYPES) or file_name in BANNED_FILE_NAMES):
+            print(f"Removing file {file_name}.")
+            os.remove(old_path)
+            continue
+        if use_recursion and not isfile(old_path):
+            print(f"Recursion in directory {file_name}.")
+            clean_up_path(old_path, True)
+
         new_name = get_filtered_name(file_name)
         if file_name != new_name:
             new_path = os.path.join(path, new_name)
-            os.rename(os.path.join(path, file_name), new_path)
-            if use_recursion and not isfile(new_path):
-                print("recursion " + new_path)
-                rename(new_path, True)
+            os.rename(old_path, new_path)
             amount += 1
-    print(f"Renamed {amount} item{'' if amount == 1 else 's'}.")
+    base_name = os.path.basename(path)
+    print(f"Renamed {amount} item{'' if amount == 1 else 's'} in path {base_name}.")
 
 
 def get_hash(url: str):
@@ -72,10 +81,10 @@ def wait_for_torrent(url: str, client: qbittorrentapi.Client) -> str:
             progress = torrent.progress * 100
             bar.n = progress
             if progress >= 100.0:
-                # client.torrents_delete(torrent_hashes=torrent.hash)
-                # client.torrent_tags.delete_tags(tags=get_hash(url))
+                client.torrents_delete(torrent_hashes=torrent.hash)
+                client.torrent_tags.delete_tags(tags=get_hash(url))
                 bar.update(0)
-                return torrent.name
+                return os.path.basename(torrent.content_path)
             state = torrent.state_enum.name.capitalize().replace("_", " ")
             bar.set_description(f"{state} '{get_filtered_name(torrent.name)}'")
 
@@ -107,12 +116,12 @@ def run(path: str, url: str):
     print()
     downloads_file_name = os.path.join(downloads, torrent_name)
     final_file_name = os.path.join(final_path, torrent_name)
-    print(f"Moving from {downloads_file_name} to {final_file_name}")
-    copy_tree(downloads_file_name, final_file_name)
+    print(f"Moving from {downloads_file_name} to {final_file_name}\n")
+    shutil.move(downloads_file_name, final_file_name)
 
     if not isfile(final_file_name):
-        rename(final_file_name, use_recursion=True)
-    rename(final_path)
+        clean_up_path(final_file_name, use_recursion=True)
+    clean_up_path(final_path)
     print("Finished successfully.")
 
 
@@ -121,7 +130,7 @@ def main():
         print("Error, script not started as root.")
     elif len(sys.argv) == 3 and "--rename" == sys.argv[2]:
         path = sys.argv[1]
-        rename(path, use_recursion=True)
+        clean_up_path(path, use_recursion=True)
     elif len(sys.argv) == 3:
         path = sys.argv[1]
         url = sys.argv[2]
