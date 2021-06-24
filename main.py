@@ -51,8 +51,9 @@ def clean_up_path(path: str, use_recursion=False):
             new_path = os.path.join(path, new_name)
             os.rename(old_path, new_path)
             amount += 1
+    path = path[:-1] if path.endswith("/") else path
     base_name = os.path.basename(path)
-    print(f"Renamed {amount} item{'' if amount == 1 else 's'} in path {base_name}.")
+    print(f"Renamed {amount} item{'' if amount == 1 else 's'} in path '{base_name}'.")
 
 
 def get_hash(url: str):
@@ -107,7 +108,7 @@ def run(path: str, url: str):
     ip = os.environ["TORRENT_IP"]
     port = os.environ["TORRENT_PORT"]
 
-    client = qbittorrentapi.Client(host=f'{ip}:{port}', username=username, password=password)
+    client = qbittorrentapi.Client(host=f"{ip}:{port}", username=username, password=password)
     client.torrents_add(urls=url, category=CATEGORY_NAME, tags=get_hash(url))
     sleep(1)
 
