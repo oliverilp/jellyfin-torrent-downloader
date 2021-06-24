@@ -14,6 +14,8 @@ from hurry.filesize import size, alternative
 from tqdm import tqdm
 
 CATEGORY_NAME = "jellyfin-downloader"
+ALLOWED_FILE_TYPES = (".mkv", ".mp4", ".mp3", ".ass", ".srt", ".png", ".jpg", ".txt")
+BANNED_FILE_NAMES = ("RARBG.txt",)
 
 
 def get_filtered_name(file_name: str, count: int = 3):
@@ -27,13 +29,18 @@ def get_filtered_name(file_name: str, count: int = 3):
     return filtered
 
 
-def rename(path: str):
+# If every item is dir then use rec
+# Find newest dir
+def rename(path: str, use_recursion=False):
     files = listdir(path)
     amount = 0
     for file_name in files:
-        filtered_name = get_filtered_name(file_name)
-        if file_name != filtered_name:
-            os.rename(os.path.join(path, file_name), os.path.join(path, filtered_name))
+        new_name = get_filtered_name(file_name)
+        if file_name != new_name:
+            new_path = os.path.join(path, new_name)
+            os.rename(os.path.join(path, file_name), new_path)
+            if use_recursion and not isfile(new_name):
+                rename(new_path, True)
             amount += 1
     print(f"Renamed {amount} item{'' if amount == 1 else 's'}.")
 
@@ -96,13 +103,13 @@ def run(path: str, url: str):
 
     torrent_name = wait_for_torrent(url, client)
     print()
-    initial_file_name = os.path.join(downloads, torrent_name)
+    downloads_file_name = os.path.join(downloads, torrent_name)
     final_file_name = os.path.join(final_path, torrent_name)
-    print(f"Moving from {initial_file_name} to {final_file_name}")
-    shutil.move(os.path.join(downloads, torrent_name), final_file_name)
+    print(f"Moving from {downloads_file_name} to {final_file_name}")
+    shutil.move(downloads_file_name, final_file_name)
 
     if not isfile(final_file_name):
-        rename(final_file_name)
+        rename(final_file_name, use_recursion=True)
     rename(final_path)
     print("Finished successfully.")
 
