@@ -1,17 +1,17 @@
+import base64
+import hashlib
 import os
 import re
 import shutil
 import sys
-import requests
-from time import sleep
-from urllib import parse
 from os import listdir
 from os.path import isfile
 from pathlib import Path
-from difflib import get_close_matches
-from tqdm import tqdm
+from time import sleep
+
 import qbittorrentapi
 from hurry.filesize import size, alternative
+from tqdm import tqdm
 
 CATEGORY_NAME = "jellyfin-downloader"
 
@@ -36,46 +36,33 @@ def rename(path: str):
     print(f"Renamed {amount} item{'' if amount == 1 else 's'}.")
 
 
-def get_torrent_name(url: str) -> str:
-    r = requests.get(url, allow_redirects=True)
-    response = r.headers.get("content-disposition")
-    match = re.search(r"(?<=filename=\").*?(?=.torrent)", response)
-    return parse.unquote(match.group())
+def get_hash(url: str):
+    md5 = hashlib.md5(url.encode('utf-8'))
+    return base64.b64encode(md5.digest()).decode()[:-2]
 
 
-def get_torrent(name: str, torrents: list):
-    filtered = list(filter(lambda t: t.category == CATEGORY_NAME, torrents))
-    torrent_names = list(map(lambda t: t.name, filtered))
-    if len(torrent_names) == 1:
-        match_name = torrent_names[0]
-    else:
-        matches = get_close_matches(name, torrent_names)
-        if not matches:
-            new_name = get_filtered_name(name)
-            print(new_name, name)
-            print("names", torrent_names)
-            if new_name == name:
-                raise RuntimeError("Cannot find torrent")
-            return get_torrent(new_name, torrents)
-        match_name = matches[0]
-    return list(filter(lambda t: t.name == match_name, torrents))[0]
+def get_torrent(url: str, torrents: list):
+    md5 = get_hash(url)
+    try:
+        return list(filter(lambda t: t.category == CATEGORY_NAME and t.tags == md5, torrents))[0]
+    except IndexError:
+        raise RuntimeError("Cannot find torrent: " + md5)
 
 
 def wait_for_torrent(url: str, client: qbittorrentapi.Client) -> str:
-    name = get_torrent_name(url)
-    custom_format = "{desc}{percentage:5.2f}% |{bar}| [{elapsed}{postfix}]"
-
-    torrent = get_torrent(name, client.torrents.info())
+    torrent = get_torrent(url, client.torrents.info())
     total_size = size(torrent.properties.total_size, system=alternative)
-    print(f"Torrent file: '{name}' ({total_size})")
+    print(f"Torrent file: '{torrent.name}' ({total_size})")
 
+    custom_format = "{desc}{percentage:5.2f}% |{bar}| [{elapsed}{postfix}]"
     with tqdm(total=100, bar_format=custom_format, dynamic_ncols=True, colour="green") as bar:
         while True:
-            torrent = get_torrent(name, client.torrents.info())
+            torrent = get_torrent(url, client.torrents.info())
             progress = torrent.progress * 100
             bar.n = progress
             if progress >= 100.0:
                 client.torrents_delete(torrent_hashes=torrent.hash)
+                client.torrent_tags.delete_tags(tags=get_hash(url))
                 bar.update(0)
                 return torrent.name
             state = torrent.state_enum.name.capitalize().replace("_", " ")
@@ -102,7 +89,7 @@ def run(path: str, url: str):
     port = os.environ["TORRENT_PORT"]
 
     client = qbittorrentapi.Client(host=f'{ip}:{port}', username=username, password=password)
-    client.torrents_add(urls=url, category=CATEGORY_NAME)
+    client.torrents_add(urls=url, category=CATEGORY_NAME, tags=get_hash(url))
     sleep(1)
 
     torrent_name = wait_for_torrent(url, client)
