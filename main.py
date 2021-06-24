@@ -18,6 +18,8 @@ CATEGORY_NAME = "jellyfin-downloader"
 
 def get_filtered_name(file_name: str, count: int = 3):
     filtered = re.sub(r"(\[.*?\])|(\d{3,4}p)|(\((?!\d{4}).*?\))", "", file_name)
+    if " " not in file_name and file_name.count(".") >= 3:
+        filtered = re.sub(r"\.(?!\w{3}$)", " ", filtered)  # Replace dots with spaces
     filtered = re.sub(r"(\s+(?=\.\w+$))", "", filtered).strip()  # clean up whitespace
     filtered = re.sub(r"(\s{2,})", " ", filtered)  # clean up multiple white space characters
     if count != 0:
