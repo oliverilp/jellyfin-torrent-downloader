@@ -39,7 +39,8 @@ def rename(path: str, use_recursion=False):
         if file_name != new_name:
             new_path = os.path.join(path, new_name)
             os.rename(os.path.join(path, file_name), new_path)
-            if use_recursion and not isfile(new_name):
+            if use_recursion and not isfile(new_path):
+                print("recursion " + new_path)
                 rename(new_path, True)
             amount += 1
     print(f"Renamed {amount} item{'' if amount == 1 else 's'}.")
@@ -106,7 +107,7 @@ def run(path: str, url: str):
     downloads_file_name = os.path.join(downloads, torrent_name)
     final_file_name = os.path.join(final_path, torrent_name)
     print(f"Moving from {downloads_file_name} to {final_file_name}")
-    shutil.move(downloads_file_name, final_file_name)
+    shutil.copy(downloads_file_name, final_file_name)
 
     if not isfile(final_file_name):
         rename(final_file_name, use_recursion=True)
