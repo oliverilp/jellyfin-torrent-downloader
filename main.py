@@ -14,9 +14,9 @@ from hurry.filesize import size, alternative
 from tqdm import tqdm
 
 CATEGORY_NAME = "jellyfin-downloader"
-ALLOWED_FILE_TYPES = (".mkv", ".mp4", ".mp3", ".ass", ".srt", ".png", ".jpg", ".txt")
+ALLOWED_FILE_TYPES = (".mkv", ".mp4", ".avi", ".mp3", ".ass", ".srt", ".png", ".jpg", ".txt")
 BANNED_FILE_NAMES = {"RARBG.txt"}
-BANNED_WORDS = {"rarbg", "bluray", "blu-ray", "x264-", "x265-", "h264-", "h265-", "webrip"}
+BANNED_WORDS = {"rarbg", "bluray", "blu-ray", "x264-", "x265-", "h264-", "h265-", "hevc", "webrip", "hdrip", "web-dl"}
 
 
 def get_filtered_name(file_name: str, count: int = 3):
