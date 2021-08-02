@@ -8,6 +8,7 @@ from os import listdir
 from os.path import isfile
 from pathlib import Path
 from time import sleep
+import readline
 
 import qbittorrentapi
 from hurry.filesize import size, alternative
@@ -95,7 +96,17 @@ def wait_for_torrent(url: str, client: qbittorrentapi.Client) -> str:
             sleep(1)
 
 
-def run(path: str, url: str):
+def input_with_prefill(prompt, text):
+    def hook():
+        readline.insert_text(text)
+        readline.redisplay()
+    readline.set_pre_input_hook(hook)
+    result = input(prompt)
+    readline.set_pre_input_hook()
+    return result
+
+
+def run(path: str, url_list: list):
     base_path = "/srv/dev-disk-by-uuid-2ea83a94-368c-46b4-83c5-a8433a4dd5cc/media/"
     downloads = os.path.normpath(os.path.join(base_path, "downloads"))
     final_path = os.path.normpath(os.path.join(base_path, path))
@@ -109,20 +120,22 @@ def run(path: str, url: str):
     port = os.environ["TORRENT_PORT"]
 
     client = qbittorrentapi.Client(host=f"{ip}:{port}", username=username, password=password)
-    client.torrents_add(urls=url, category=CATEGORY_NAME, tags=get_hash(url))
+    for url in url_list:
+        client.torrents_add(urls=url, category=CATEGORY_NAME, tags=get_hash(url))
     sleep(1)
 
-    torrent_name = wait_for_torrent(url, client)
-    print()
-    downloads_file_name = os.path.join(downloads, torrent_name)
-    final_file_name = os.path.join(final_path, torrent_name)
-    print(f"Moving from {downloads_file_name} to {final_file_name}\n")
-    shutil.move(downloads_file_name, final_file_name)
+    for url in url_list:
+        torrent_name = wait_for_torrent(url, client)
+        print()
+        downloads_file_name = os.path.join(downloads, torrent_name)
+        final_file_name = os.path.join(final_path, torrent_name)
+        print(f"Moving from {downloads_file_name} to {final_file_name}\n")
+        shutil.move(downloads_file_name, final_file_name)
 
-    if not isfile(final_file_name):
-        clean_up_path(final_file_name, use_recursion=True)
-    clean_up_path(final_path)
-    print("Finished successfully.")
+        if not isfile(final_file_name):
+            clean_up_path(final_file_name, use_recursion=True)
+        clean_up_path(final_path)
+        print("Finished successfully.")
 
 
 def main():
@@ -131,14 +144,17 @@ def main():
     elif len(sys.argv) == 3 and "--rename" == sys.argv[2]:
         path = sys.argv[1]
         clean_up_path(path, use_recursion=True)
-    elif len(sys.argv) == 3:
+    elif len(sys.argv) >= 3:
         path = sys.argv[1]
-        url = sys.argv[2]
-        run(path, url)
+        url_list = sys.argv[2:]
+        print(url_list)
+        run(path, url_list)
     else:
         print("Error, incorrect arguments.")
 
 
 if __name__ == "__main__":
-    # main()
-    print(get_filtered_name("Blade Runner 2049.HDRip.XviD.AC3-EVO"))
+    main()
+    # x = input_with_prefill("Rename directory: ", "/path/name")
+    # print()
+    # print(x)
