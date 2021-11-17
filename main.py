@@ -11,7 +11,6 @@ from time import sleep
 import readline
 
 import qbittorrentapi
-from hurry.filesize import size, alternative
 from tqdm import tqdm
 
 CATEGORY_NAME = "jellyfin-downloader"
@@ -70,9 +69,19 @@ def get_torrent(url: str, torrents: list):
         raise RuntimeError("Cannot find torrent: " + md5)
 
 
+def human_size(nbytes):
+    suffixes = ["B", "KB", "MB", "GB", "TB", "PB"]
+    i = 0
+    while nbytes >= 1024 and i < len(suffixes) - 1:
+        nbytes /= 1024.
+        i += 1
+    f = ("%.2f" % nbytes).rstrip("0").rstrip(".")
+    return '%s %s' % (f, suffixes[i])
+
+
 def wait_for_torrent(url: str, client: qbittorrentapi.Client) -> str:
     torrent = get_torrent(url, client.torrents.info())
-    total_size = size(torrent.properties.total_size, system=alternative)
+    total_size = human_size(torrent.properties.total_size)
     print(f"Torrent file: '{torrent.name}' ({total_size})")
 
     custom_format = "{desc}{percentage:5.2f}% |{bar}| [{elapsed}{postfix}]"
@@ -90,7 +99,7 @@ def wait_for_torrent(url: str, client: qbittorrentapi.Client) -> str:
             bar.set_description(f"{state} '{get_filtered_name(torrent.name)}'")
 
             eta = round(torrent.eta / 60)
-            speed = size(torrent.dlspeed, system=alternative)
+            speed = human_size(torrent.dlspeed)
             bar.set_postfix_str(f"{eta if eta > 0 else '< 1'}m, {speed}/s")
             bar.update(0)
             sleep(1)
@@ -147,7 +156,6 @@ def main():
     elif len(sys.argv) >= 3:
         path = sys.argv[1]
         url_list = sys.argv[2:]
-        print(url_list)
         run(path, url_list)
     else:
         print("Error, incorrect arguments.")
