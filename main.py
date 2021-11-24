@@ -63,13 +63,13 @@ def clean_up_path(path: str, use_recursion=False):
         f"Renamed {amount} item{'' if amount == 1 else 's'} in path '{base_name}'.")
 
 
-def get_hash(url: str):
-    md5 = hashlib.md5(url.encode('utf-8'))
+def get_hash(uri: str):
+    md5 = hashlib.md5(uri.encode('utf-8'))
     return base64.b64encode(md5.digest()).decode()[:-2]
 
 
-def get_torrent(url: str, torrents: list):
-    md5 = get_hash(url)
+def get_torrent(uri: str, torrents: list):
+    md5 = get_hash(uri)
     try:
         return list(filter(lambda t: t.category == CATEGORY_NAME and t.tags == md5, torrents))[0]
     except IndexError:
@@ -86,30 +86,30 @@ def human_size(nbytes):
     return '%s %s' % (f, suffixes[i])
 
 
-def wait_for_torrent(url: str, path: str, client: qbittorrentapi.Client) -> str:
-    torrent = get_torrent(url, client.torrents.info())
+def wait_for_torrent(uri: str, path: str, client: qbittorrentapi.Client) -> str:
+    torrent = get_torrent(uri, client.torrents.info())
     total_size = human_size(torrent.properties.total_size)
     print(f"Torrent file: '{torrent.name}' ({total_size})")
 
-    url = "http://localhost:5002/torrents"
+    api_url = "http://localhost:5002/torrents"
     headers = {'Content-Type': 'application/json'}
     payload = json.dumps({
         "name": torrent.name,
-        "uri": url,
+        "uri": uri,
         "path": path,
         "size": total_size
     })
-    requests.post(url, headers=headers, data=payload)
+    requests.post(api_url, headers=headers, data=payload)
 
     custom_format = "{desc}{percentage:5.2f}% |{bar}| [{elapsed}{postfix}]"
     with tqdm(total=100, bar_format=custom_format, dynamic_ncols=True, colour="green") as bar:
         while True:
-            torrent = get_torrent(url, client.torrents.info())
+            torrent = get_torrent(uri, client.torrents.info())
             progress = torrent.progress * 100
             bar.n = progress
             if progress >= 100.0:
                 client.torrents_delete(torrent_hashes=torrent.hash)
-                client.torrent_tags.delete_tags(tags=get_hash(url))
+                client.torrent_tags.delete_tags(tags=get_hash(uri))
                 bar.update(0)
                 return os.path.basename(torrent.content_path)
             state = torrent.state_enum.name.capitalize().replace("_", " ")
@@ -132,7 +132,7 @@ def input_with_prefill(prompt, text):
     return result
 
 
-def run(path: str, url_list: list):
+def run(path: str, uri_list: list):
     base_path = "/srv/dev-disk-by-uuid-2ea83a94-368c-46b4-83c5-a8433a4dd5cc/media/"
     downloads = os.path.normpath(os.path.join(base_path, "downloads"))
     final_path = os.path.normpath(os.path.join(base_path, path))
@@ -148,14 +148,14 @@ def run(path: str, url_list: list):
     client = qbittorrentapi.Client(host=f"{ip}:{port}",
                                    username=username, 
                                    password=password)
-    for url in url_list:
-        client.torrents_add(urls=url,
+    for uri in uri_list:
+        client.torrents_add(urls=uri,
                             category=CATEGORY_NAME,
-                            tags=get_hash(url))
+                            tags=get_hash(uri))
     sleep(1)
 
-    for url in url_list:
-        torrent_name = wait_for_torrent(url, path, client)
+    for uri in uri_list:
+        torrent_name = wait_for_torrent(uri, path, client)
         print()
         downloads_file_name = os.path.join(downloads, torrent_name)
         final_file_name = os.path.join(final_path, torrent_name)
@@ -176,8 +176,8 @@ def main():
         clean_up_path(path, use_recursion=True)
     elif len(sys.argv) >= 3:
         path = sys.argv[1]
-        url_list = sys.argv[2:]
-        run(path, url_list)
+        uri_list = sys.argv[2:]
+        run(path, uri_list)
     else:
         print("Error, incorrect arguments.")
 
