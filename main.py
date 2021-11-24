@@ -9,6 +9,7 @@ from os.path import isfile
 from pathlib import Path
 from time import sleep
 import readline
+import requests
 
 import qbittorrentapi
 from tqdm import tqdm
@@ -20,13 +21,16 @@ BANNED_WORDS = {"rarbg", "bluray", "blu-ray", "x264-", "x265-", "h264-", "h265-"
 
 
 def get_filtered_name(file_name: str, count: int = 3):
-    filtered = re.sub(r"(\[.*?\])|(\d{3,4}p)|(\((?!\d{4}).*?\))", "", file_name)
+    filtered = re.sub(
+        r"(\[.*?\])|(\d{3,4}p)|(\((?!\d{4}).*?\))", "", file_name)
     if " " not in file_name and file_name.count(".") >= 3:
-        filtered = re.sub(r"\.(?!\w{3}$)", " ", filtered)  # Replace dots with spaces
+        # Replace dots with spaces
+        filtered = re.sub(r"\.(?!\w{3}$)", " ", filtered)
     for word in BANNED_WORDS:
         filtered = re.sub(word, '', filtered, flags=re.IGNORECASE)
 
-    filtered = re.sub(r"(\s+(?=\.\w+$))", "", filtered).strip()  # clean up whitespace
+    filtered = re.sub(r"(\s+(?=\.\w+$))", "",
+                      filtered).strip()  # clean up whitespace
     filtered = re.sub(r"(\s{2,})|(\.{2,})", " ", filtered)
     if count != 0:
         return get_filtered_name(filtered, count - 1) if len(filtered) > 4 else file_name
@@ -53,7 +57,8 @@ def clean_up_path(path: str, use_recursion=False):
             amount += 1
     path = path[:-1] if path.endswith("/") else path
     base_name = os.path.basename(path)
-    print(f"Renamed {amount} item{'' if amount == 1 else 's'} in path '{base_name}'.")
+    print(
+        f"Renamed {amount} item{'' if amount == 1 else 's'} in path '{base_name}'.")
 
 
 def get_hash(url: str):
@@ -79,10 +84,16 @@ def human_size(nbytes):
     return '%s %s' % (f, suffixes[i])
 
 
-def wait_for_torrent(url: str, client: qbittorrentapi.Client) -> str:
+def wait_for_torrent(url: str, path: str, client: qbittorrentapi.Client) -> str:
     torrent = get_torrent(url, client.torrents.info())
     total_size = human_size(torrent.properties.total_size)
     print(f"Torrent file: '{torrent.name}' ({total_size})")
+    requests.post('localhost:5002/torrents', data={
+        "name": torrent.name,
+        "uri": url,
+        "path": path,
+        "size": total_size
+    })
 
     custom_format = "{desc}{percentage:5.2f}% |{bar}| [{elapsed}{postfix}]"
     with tqdm(total=100, bar_format=custom_format, dynamic_ncols=True, colour="green") as bar:
@@ -128,13 +139,17 @@ def run(path: str, url_list: list):
     ip = os.environ["TORRENT_IP"]
     port = os.environ["TORRENT_PORT"]
 
-    client = qbittorrentapi.Client(host=f"{ip}:{port}", username=username, password=password)
+    client = qbittorrentapi.Client(host=f"{ip}:{port}",
+                                   username=username, 
+                                   password=password)
     for url in url_list:
-        client.torrents_add(urls=url, category=CATEGORY_NAME, tags=get_hash(url))
+        client.torrents_add(urls=url,
+                            category=CATEGORY_NAME,
+                            tags=get_hash(url))
     sleep(1)
 
     for url in url_list:
-        torrent_name = wait_for_torrent(url, client)
+        torrent_name = wait_for_torrent(url, path, client)
         print()
         downloads_file_name = os.path.join(downloads, torrent_name)
         final_file_name = os.path.join(final_path, torrent_name)
