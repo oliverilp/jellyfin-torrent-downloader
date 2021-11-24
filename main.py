@@ -169,9 +169,9 @@ def run(path: str, uri_list: list):
 
 
 def main():
-    if os.geteuid() != 0:
-        print("Error, script not started as root.")
-    elif len(sys.argv) == 3 and "--rename" == sys.argv[2]:
+    # if os.geteuid() != 0:
+    #     print("Error, script not started as root.")
+    if len(sys.argv) == 3 and "--rename" == sys.argv[2]:
         path = sys.argv[1]
         clean_up_path(path, use_recursion=True)
     elif len(sys.argv) >= 3:
