@@ -10,6 +10,8 @@ from pathlib import Path
 from time import sleep
 import readline
 import requests
+import requests
+import json
 
 import qbittorrentapi
 from tqdm import tqdm
@@ -88,12 +90,16 @@ def wait_for_torrent(url: str, path: str, client: qbittorrentapi.Client) -> str:
     torrent = get_torrent(url, client.torrents.info())
     total_size = human_size(torrent.properties.total_size)
     print(f"Torrent file: '{torrent.name}' ({total_size})")
-    requests.post('localhost:5002/torrents', data={
+
+    url = "http://localhost:5002/torrents"
+    headers = {'Content-Type': 'application/json'}
+    payload = json.dumps({
         "name": torrent.name,
         "uri": url,
         "path": path,
         "size": total_size
     })
+    requests.post(url, headers=headers, data=payload)
 
     custom_format = "{desc}{percentage:5.2f}% |{bar}| [{elapsed}{postfix}]"
     with tqdm(total=100, bar_format=custom_format, dynamic_ncols=True, colour="green") as bar:
